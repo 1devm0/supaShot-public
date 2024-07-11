@@ -1,0 +1,3 @@
+build ${OBJ_PATH}/editor.obj:   CC src/level_ed.c
+build ${OBJ_PATH}/program.a: AR ${OBJ_PATH}/editor.obj
+

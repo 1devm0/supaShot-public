@@ -1,0 +1,15 @@
+rule CC
+    command = gcc ${in} -c -o ${out} ${INCLUDES} ${flags} -D${TERM_TYPE}
+    description = Compiling .obj 
+
+rule LINK
+    command = gcc -o ${out} ${in} ${flags} ${INCLUDES} -lmingw32 -lpsapi -Lbuild/exe/lib ${libs}
+    description = Compiling into binary ${out}
+# -mwindows for no console window
+
+rule AR
+    command = ar -rc ${out} ${in}
+    description = Linking .a
+
+OUT = build/exe/game.exe
+OBJ_PATH = build/exe/obj/

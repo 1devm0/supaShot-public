@@ -1,0 +1,3 @@
+build ${OBJ_PATH}/art.obj:   CC src/art.c
+build ${OBJ_PATH}/program.a: AR ${OBJ_PATH}/art.obj
+

@@ -45,12 +45,19 @@ typedef size_t sz_t;
 #pragma once
 
 // https://stackoverflow.com/questions/3437404/min-and-max-in-c 
-#define min(a,b) \
-({ __typeof__ (a) _a = (a); \
-   __typeof__ (b) _b = (b); \
- _a > _b ? _b : _a; })
+#define max(a,b)             \
+({                           \
+    __typeof__ (a) _a = (a); \
+    __typeof__ (b) _b = (b); \
+    _a > _b ? _a : _b;       \
+})
 
-
+#define min(a,b)             \
+({                           \
+    __typeof__ (a) _a = (a); \
+    __typeof__ (b) _b = (b); \
+    _a < _b ? _a : _b;       \
+})
 
 /*
 ////////////////////////////////////////
@@ -123,7 +130,7 @@ char * ui32_to_str(i32 i, char * special_str, u32 char_number);
 i32 ustr_to_i32(char * str);
 
 
-u64 uhash_id(const char * id);
+u64 uhash_id(char * id);
 
 sz_t uis_prime(const sz_t x);
 sz_t unext_prime(sz_t x); 
@@ -180,6 +187,7 @@ typedef struct {
 } uprof_t;
 
 
+i32 get_mem_used();
 void uprof_start(uprof_t * profiler);
 void uprof_end(uprof_t * profiler);
 
@@ -285,10 +293,12 @@ void uprof_end(uprof_t * profiler);
 #define CHT_DEF(tn, name) \
     typedef struct _uht_##name##_t { char * id; tn data; struct _uht_##name##_t * next; } uht_##name##_pair_t; \
     typedef struct { uht_##name##_pair_t ** e; sz_t used; sz_t sz; u64 collisions; } uht_##name##_t; \
+    typedef struct { u08 found; tn data; } uht_item_##name##_found_t; \
     void uht_##name##_mk(uht_##name##_t * t, sz_t sz);\
     void uht_##name##_check_resize(uht_##name##_t * t); \
     u08 uht_##name##_add(uht_##name##_t * t, char * id, tn data); \
     tn * uht_##name##_get(uht_##name##_t * t, char * id, tn * p); \
+    uht_item_##name##_found_t uht_##name##_betget(uht_##name##_t * t, char * id); \
     u08 uht_##name##_has(uht_##name##_t * t, char * id); \
     void uht_##name##_rm(uht_##name##_t * t);
 
@@ -317,9 +327,10 @@ void uprof_end(uprof_t * profiler);
         return 3; \
     } \
     void uht_##name##_check_resize(uht_##name##_t * t) { \
-        if (((f32) t -> used / t -> sz) > 0.7) { \
+        if (((f32) t -> used / t -> sz) > 0.6) { \
             uht_##name##_t * n = ualloc(1, uht_##name##_t); \
-            uht_##name##_mk(n, t -> sz * 3.5); \
+            n -> collisions = 0; \
+            uht_##name##_mk(n, t -> sz * 3); \
             for (u64 u = 0; u < t -> sz; u++) { \
                 uht_##name##_pair_t * current = t -> e[u]; \
                 while (current) { \
@@ -331,6 +342,7 @@ void uprof_end(uprof_t * profiler);
             t -> e = n -> e; \
             t -> sz = n -> sz; \
             t -> used = n -> used; \
+            t -> collisions = n -> collisions; \
         } \
     } \
     tn * uht_##name##_get(uht_##name##_t * t, char * id, tn * p) { \
@@ -342,6 +354,17 @@ void uprof_end(uprof_t * profiler);
         } \
         return p;\
     } \
+    uht_item_##name##_found_t uht_##name##_betget(uht_##name##_t * t, char * id) { \
+        uht_item_##name##_found_t item; \
+        u64 idx = uhash_id(id) % t -> sz; \
+        uht_##name##_pair_t * current = t -> e[idx]; \
+        while (current) { \
+            if (!strcmp(current -> id, id)) { item.found = 1; item.data = current -> data; return item; } \
+            current = current -> next; \
+        } \
+        return (uht_item_##name##_found_t) { 0, 0 };\
+    } \
+    uht_item_##name##_found_t uht_##name##_betget(uht_##name##_t * t, char * id); \
     u08 uht_##name##_has(uht_##name##_t * t, char * id) { \
         u64 idx = uhash_id(id) % t -> sz; \
         u08 found = 0; \
@@ -357,9 +380,225 @@ void uprof_end(uprof_t * profiler);
         t -> e = NULL; \
         t -> used = 0; \
         t -> sz = 0; \
+        t -> collisions = 0; \
     }
 // shitty free
 
+
+u64 uhash_bytes(void * ptr, u64 size);
+
+
+// implement removing pairs
+// can only comfortably handle 250k objects
+
+
+// oppen addressed hash table implementation
+#define OCSHT_DEF(key_tp, tn, name) \
+    typedef struct _tsuht_##name##_t { key_tp * id; tn data; u08 set; } tsuht_##name##_pair_t; \
+    typedef struct { tsuht_##name##_pair_t * e; sz_t used; sz_t sz; u64 collisions; } tsuht_##name##_t; \
+    typedef struct { u08 found; tn data; } tsuht_item_##name##_found_t; \
+    void tsuht_##name##_mk(tsuht_##name##_t * t, sz_t sz);\
+    void tsuht_##name##_check_resize(tsuht_##name##_t * t); \
+    u08 tsuht_##name##_add(tsuht_##name##_t * t, key_tp * id, tn data); \
+    tn * tsuht_##name##_get(tsuht_##name##_t * t, key_tp * id, tn * p); \
+    tsuht_item_##name##_found_t tsuht_##name##_betget(tsuht_##name##_t * t, key_tp * id); \
+    u08 tsuht_##name##_has(tsuht_##name##_t * t, key_tp * id); \
+    void tsuht_##name##_rm(tsuht_##name##_t * t); \
+    void tsuht_##name##_rm_pair(tsuht_##name##_t * t, key_tp * id); 
+
+#define OCSHT_IMPL(key_tp, key_tp_size, tn, name) \
+    void tsuht_##name##_mk(tsuht_##name##_t *t, sz_t sz) { \
+        t->sz = sz; \
+        t->e = ualloc(t->sz, tsuht_##name##_pair_t); \
+        t->collisions = 0; \
+        t->used = 0; \
+    } \
+    u08 tsuht_##name##_add(tsuht_##name##_t *t, key_tp *id, tn data) { \
+        tsuht_##name##_check_resize(t); \
+        u64 idx = uhash_bytes(id, key_tp_size) % t->sz; \
+        while (t->e[idx].set && memcmp(t->e[idx].id, id, key_tp_size) && idx < t -> sz) { t->collisions++; idx = (idx + 1) % t->sz; } \
+        if (t->e[idx].set && !memcmp(t->e[idx].id, id, key_tp_size)) { t->e[idx].data = data; return 1; } \
+        t->e[idx].id = calloc(1, key_tp_size); \
+        if (!t -> e[idx].id) printf("FAILED allocation of size: %u\n", key_tp_size); \
+        memcpy(t -> e[idx].id, id, key_tp_size); \
+        t->e[idx].data = data; \
+        t->e[idx].set = 1; \
+        t->used++; return 2; \
+    } \
+    void tsuht_##name##_check_resize(tsuht_##name##_t *t) { \
+        if (((f32)t->used / t->sz) > 0.75) { \
+            tsuht_##name##_t *n = ualloc(1, tsuht_##name##_t); \
+            n->collisions = 0; \
+            tsuht_##name##_mk(n, t->sz * 2); \
+            for (u64 u = 0; u < t->sz; u++) { \
+                if (t->e[u].set) { \
+                    tsuht_##name##_add(n, t->e[u].id, t->e[u].data); \
+                    ufree(t -> e[u].id); \
+                } \
+            } \
+            ufree(t -> e); \
+            *t = *n; \
+        } \
+    } \
+    tsuht_item_##name##_found_t tsuht_##name##_betget(tsuht_##name##_t *t, key_tp *id) { \
+        u64 idx = uhash_bytes(id, key_tp_size) % t->sz; \
+        tsuht_item_##name##_found_t pair = {0}; \
+        while (t->e[idx].set && memcmp(t->e[idx].id, id, key_tp_size) && idx < t->sz) { idx = (idx + 1) % t->sz; } \
+        if (t->e[idx].set && !memcmp(t->e[idx].id, id, key_tp_size)) { pair.found = 1; pair.data = t->e[idx].data; return pair; } \
+        return pair; \
+    } \
+    void tsuht_##name##_rm(tsuht_##name##_t *t) { \
+        for (sz_t i = 0; i < t->sz; i++) { \
+            if (t->e[i].set) { \
+                ufree(t->e[i].id); \
+            } \
+        } \
+        ufree(t->e); \
+        t->e = NULL; \
+        t->used = 0; \
+        t->sz = 0; \
+        t->collisions = 0; \
+    } \
+    void tsuht_##name##_rm_pair(tsuht_##name##_t * t, key_tp * id) { \
+        u64 idx = uhash_bytes(id, key_tp_size) % t->sz; \
+        tsuht_item_##name##_found_t pair = {0}; \
+        while (t->e[idx].set && memcmp(t->e[idx].id, id, key_tp_size) && idx < t->sz) { idx = (idx + 1) % t->sz; } \
+        if (t->e[idx].set && !memcmp(t->e[idx].id, id, key_tp_size)) { memset(&t -> e[idx].data, 0, sizeof(tn)); } \
+    }
+
+
+// better chained implementation
+#define CHD_HT_DEF(key_tp, tn, name) \
+    typedef struct _uchdht_##name##_t { key_tp * id; tn data; u08 set; struct _uchdht_##name##_t * next; } uchdht_##name##_pair_t; \
+    typedef struct { uchdht_##name##_pair_t ** e; sz_t used; sz_t sz; u64 collisions; } uchdht_##name##_t; \
+    typedef struct { u08 found; tn data; } uchdht_item_##name##_found_t; \
+    void uchdht_##name##_mk(uchdht_##name##_t * t, sz_t sz);\
+    void uchdht_##name##_check_resize(uchdht_##name##_t * t); \
+    u08 uchdht_##name##_add(uchdht_##name##_t * t, key_tp * id, tn data); \
+    tn * uchdht_##name##_get(uchdht_##name##_t * t, key_tp * id, tn * p); \
+    uchdht_item_##name##_found_t uchdht_##name##_betget(uchdht_##name##_t * t, key_tp * id); \
+    u08 uchdht_##name##_has(uchdht_##name##_t * t, key_tp * id); \
+    void uchdht_##name##_rm(uchdht_##name##_t * t); \
+    void uchdht_##name##_rm_pair(uchdht_##name##_t * t, key_tp * id); 
+/*
+t -> e[u] = calloc(1, sizeof(uchdht_##name##_pair_t)); 
+t -> e[u] -> id = calloc(1, key_tp_size + 1); 
+t -> e[u] -> set = 0;  
+*/
+#define CHD_HT_IMPL(key_tp, key_tp_size, tn, name) \
+    uchdht_##name##_pair_t * uchdht_##name##_mk_pair() { \
+        uchdht_##name##_pair_t * p = calloc(1, sizeof(uchdht_##name##_pair_t)); \
+        p -> id = calloc(1, key_tp_size); \
+        p -> set = 0; \
+        p -> next = NULL; \
+        return p; \
+    } \
+    void uchdht_##name##_mk(uchdht_##name##_t * t, sz_t sz) { \
+        t -> sz = sz; \
+        t -> e = ualloc(t -> sz, uchdht_##name##_pair_t*); \
+        for (sz_t u = 0; u < t -> sz; u++) { \
+            t -> e[u] = uchdht_##name##_mk_pair(); \
+        }; \
+        t -> collisions = 0; \
+        t -> used = 0; \
+    } \
+    u08 uchdht_##name##_add(uchdht_##name##_t * t, key_tp * id, tn data) { \
+        uchdht_##name##_check_resize(t); \
+        u64 idx = uhash_bytes(id, key_tp_size) % t -> sz; \
+        if (!t -> e[idx] -> set) { \
+            t -> e[idx] -> data = data; \
+            memcpy(t -> e[idx] -> id, id, key_tp_size); \
+            t -> e[idx] -> set = 1; t -> e[idx] -> next = NULL; \
+            t -> used++; return 1; \
+        } \
+        uchdht_##name##_pair_t * current = t -> e[idx]; \
+        while (current -> next && memcmp(id, current -> id, key_tp_size)) { current = current -> next; } \
+        if (!memcmp(current -> id, id, key_tp_size)) { t -> e[idx] -> data = data; return 2; } \
+        t -> collisions++; \
+        current -> next = uchdht_##name##_mk_pair(); \
+        memcpy(current -> next -> id, id, key_tp_size); \
+        current -> next -> data = data; \
+        t -> used++; \
+        return 3; \
+    } \
+    void uchdht_##name##_check_resize(uchdht_##name##_t * t) { \
+        if (((f32) t -> used / t -> sz) > 0.75) { \
+            uchdht_##name##_t * n = ualloc(1, uchdht_##name##_t); \
+            n -> collisions = 0; \
+            uchdht_##name##_mk(n, t -> sz * 2); \
+            for (u64 u = 0; u < t -> sz; u++) { \
+                uchdht_##name##_pair_t * current = t -> e[u]; \
+                while (current) { \
+                    uchdht_##name##_add(n, current -> id, current -> data); \
+                    current = current -> next; \
+                } \
+            } \
+            uchdht_##name##_rm(t); \
+            t -> e = n -> e; \
+            t -> sz = n -> sz; \
+            t -> used = n -> used; \
+            t -> collisions = n -> collisions; \
+        } \
+    } \
+    tn * uchdht_##name##_get(uchdht_##name##_t * t, key_tp * id, tn * p) { \
+        u64 idx = uhash_bytes(id, key_tp_size) % t -> sz; \
+        uchdht_##name##_pair_t * current = t -> e[idx]; \
+        while (current) { \
+            if (!memcmp(current -> id, id, key_tp_size)) { *p = current -> data; return p; } \
+            current = current -> next; \
+        } \
+        return p;\
+    } \
+    uchdht_item_##name##_found_t uchdht_##name##_betget(uchdht_##name##_t * t, key_tp * id) { \
+        uchdht_item_##name##_found_t item; \
+        u64 idx = uhash_bytes(id, key_tp_size) % t -> sz; \
+        uchdht_##name##_pair_t * current = t -> e[idx]; \
+        while (current) { \
+            if (!memcmp(current -> id, id, key_tp_size)) { item.found = 1; item.data = current -> data; return item; } \
+            current = current -> next; \
+        } \
+        return (uchdht_item_##name##_found_t) { 0, 0 };\
+    } \
+    u08 uchdht_##name##_has(uchdht_##name##_t * t, key_tp * id) { \
+        u64 idx = uhash_bytes(id, key_tp_size) % t -> sz; \
+        uchdht_##name##_pair_t * current = t -> e[idx]; \
+        while (current) { \
+            if (!memcmp(current -> id, id, key_tp_size)) { return 1; } \
+            current = current -> next; \
+        } \
+        return 0;\
+    } \
+    void uchdht_##name##_free_pair(uchdht_##name##_pair_t * pair) {\
+        if (pair) { \
+            free(pair->id); \
+            free(pair);\
+        }\
+    }\
+    void uchdht_##name##_rm(uchdht_##name##_t * t) { \
+        for (sz_t u = 0; u < t->sz; u++) { \
+            uchdht_##name##_pair_t * current = t->e[u]; \
+            while (current) { \
+                uchdht_##name##_pair_t * next = current->next; \
+                uchdht_##name##_free_pair(current); \
+                current = next; \
+            } \
+        } \
+        free(t->e); \
+        t->e = NULL; \
+        t->used = 0; \
+        t->sz = 0; \
+        t->collisions = 0; \
+    } \
+    void uchdht_##name##_rm_pair(uchdht_##name##_t * t, key_tp * id) { \
+        u64 idx = uhash_bytes(id, key_tp_size) % t -> sz; \
+        uchdht_##name##_pair_t * current = t -> e[idx]; \
+        while (current) { \
+            if (!memcmp(current -> id, id, key_tp_size)) { \
+                memset(&current -> data, 0, sizeof(tn));  return; \
+            } \
+            current = current -> next; \
+        } \
+    }
 
 CVEC_DEF(u08, u08); CVEC_DEF(u16, u16); CVEC_DEF(u32, u32); CVEC_DEF(u64, u64);
 CVEC_DEF(i08, i08); CVEC_DEF(i16, i16); CVEC_DEF(i32, i32); CVEC_DEF(i64, i64);

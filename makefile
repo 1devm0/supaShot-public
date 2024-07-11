@@ -1,12 +1,12 @@
 
-winflags = -lmingw32 -lpsapi -Lbuild/exe/lib -lSDL2main -lSDL2 -lSDL2_ttf -lSDL2_mixer -lSDL2_image -lm -lgdi32 -luser32 -lkernel32 -lopengl32 
+winflags = -lmingw32 -lpsapi -Lbuild/exe/lib -lSDL2main -lSDL2 -lSDL2_ttf -lSDL2_mixer -lSDL2_image -lm -lgdi32 -luser32 -lkernel32
+# removed -lopengl32
 macflags = -framework Cocoa -framework IOKit -framework CoreFoundation -framework OpenGL -framework CoreVideo -lSDL2main -lSDL2 -lSDL2_ttf -lSDL2_mixer -lSDL2_image 
 linuxflags = -lm -lSDL2 -lSDL2_image -lSDL2_ttf -lSDL2_mixer
-emccflags = -s USE_SDL=2 -s USE_SDL_IMAGE=2 -s SDL2_IMAGE_FORMATS="['png']" -s USE_SDL_TTF=2 -s USE_SDL_MIXER=2 -s ALLOW_MEMORY_GROWTH=1 --preload-file res
-
+emccflags = -s USE_SDL=2 -s USE_SDL_IMAGE=2 -s SDL2_IMAGE_FORMATS="['png']" -s USE_SDL_TTF=2 -s USE_SDL_MIXER=2 -s ALLOW_MEMORY_GROWTH=1 --preload-file res -s TEXTDECODER=0
 dbg = -O0 -g
 fast = -O3 -DNDEBUG
-compile_lvl = $(fast)
+compile_lvl = $(dbg)
 includes = -Isrc/engine/
 flags = $(includes) -std=c11 $(compile_lvl)
 

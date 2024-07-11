@@ -1,0 +1,28 @@
+
+SDL_PATH = src/engine/SDL2
+UTILS_PATH = src/engine/utils
+ENGINE_PATH = src/engine
+GAME_PATH = src/
+ST8_PATH = src/st8_funcs
+COMPONENTS_PATH = src/st8_funcs/component_funcs
+LVLS_PATH = src/st8_funcs/component_funcs/lvls
+EVENTS_PATH = src/st8_funcs/event_funcs
+SDL_GFX_PATH = src/engine/sdl_gfx
+
+flags = -Wall -g -O0 -std=c11 
+#flags = -Wall -g -O0 -std=c99
+libs = -lSDL2main -lSDL2 -lSDL2_ttf -lSDL2_mixer -lSDL2_image -lm
+
+
+
+INCLUDES = -I ${UTILS_PATH} $
+           -I ${ENGINE_PATH} $
+           -I ${SDL_PATH} $
+           -I ${GAME_PATH} $
+           -I ${ST8_PATH} $
+           -I ${EVENTS_PATH} $
+           -I ${COMPONENTS_PATH} $
+           -I ${LVLS_PATH} $
+           -I ${SDL_GFX_PATH}
+
+

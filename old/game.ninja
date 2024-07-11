@@ -1,0 +1,3 @@
+build ${OBJ_PATH}/program.obj: CC src/main.c
+
+build ${OBJ_PATH}/program.a: AR ${OBJ_PATH}/program.obj

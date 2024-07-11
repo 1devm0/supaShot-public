@@ -1,0 +1,19 @@
+rule CC
+    command = gcc ${in} -c -o ${out} ${INCLUDES} ${flags} -D${TERM_TYPE}
+    description = compiling
+
+rule LINK
+    command = gcc ${in} ${flags} ${INCLUDES} -L/Users/mali/homebrew/lib ${libs} -o ${out}
+    description = linking 
+    
+rule AR
+    command = ar -rc ${out} ${in}
+    description = Linking again
+
+OUT = build/m1/game.out
+OBJ_PATH = build/m1/obj/
+
+# Add dyld here
+# ninja
+#export DYLD_LIBRARY_PATH=build/unix
+# ./build/unix/Game

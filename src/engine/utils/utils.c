@@ -125,24 +125,11 @@ i32 ustr_to_i32(char * string) {
     return (value); 
 }
 
-u64 uhash_id(const char * id) {
-    u64 len = strlen(id);
-    u64 hash = 0xcbf29ce484222325; // FNV_offset_basis
-    hash = (hash ^ (u08) id[0]) * 0x100000001b3;
-    hash = (hash ^ (u08) id[1]) * 0x100000001b3;
-    hash = (hash ^ (u08) id[len - 1]) * 0x100000001b3;
-    hash = (hash ^ (u08) id[len - 2]) * 0x100000001b3;
-    return hash;   
-}
-
-/*
-
-u64 uhash_id(const char * id) {
+u64 uhash_id(char * id) {
     u64 hash = 0xcbf29ce484222325; // FNV_offset_basis
     while (*id) hash = (hash ^ (u08)*id++) * 0x100000001b3; // FNV_prime
     return hash;   
 }
-*/
 
 sz_t uis_prime(const sz_t x) {
     if (x < 2) { return 0; }
@@ -204,11 +191,12 @@ i32 get_mem_used() {
         PROCESS_MEMORY_COUNTERS_EX pmc;
         GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc));
         u64 virtualMemUsedByMe = pmc.PrivateUsage;
-        return (i64) roundl(virtualMemUsedByMe / 1000000);
+        return (i32)roundl(virtualMemUsedByMe / 1000000.0);
     #else
+
         struct rusage usage;
         getrusage(RUSAGE_SELF, &usage);
-        return (i64) roundl(usage.ru_maxrss / 1000000);
+        return (i32) roundl(usage.ru_maxrss / 1000000);
     #endif
 }
 
@@ -282,6 +270,20 @@ CHT_IMPL(void *, void);
 // hold pointer to a vector of strings or a list of strings
 CHT_IMPL(uvec_char_arr_t, vec_char_arr);
 
+
+u64 uhash_bytes(void * ptr, u64 size) {
+    if (ptr != NULL) {
+        unsigned char * bytePtr = ptr;
+        u64 hash = 0xcbf29ce484222325; // FNV_offset_basis
+        for (size_t i = 0; i < size; i++) {
+            hash ^= (u64)bytePtr[i];
+            hash *= 0x100000001b3; // FNV_prime
+        }
+        return hash;
+    }
+    printf("BROKE HASH FUNCTION\n");
+    return -1;
+}
 
 void uparse_config_str(char * str, uht_vec_char_arr_t * config) { 
     /* 
@@ -1023,7 +1025,6 @@ uv2_t uphys_obj_get_scroll(uphys_obj_t * o, uv2_t render_target_size, f32 speed)
 
     return rnd;
 }
-
 void uphys_obj_update(uphys_obj_t * o, const uphys_obj_t * tiles, const u32 len, i32 max_gravity_val, f64 dt) {
     uv2_t frame_movement;
 
@@ -1110,6 +1111,9 @@ void uphys_obj_update(uphys_obj_t * o, const uphys_obj_t * tiles, const u32 len,
         o -> vel.y += 0.3 * dt;
         // o -> vel.y = min(max_gravity_val, o -> vel.y);
         o -> vel.y = min(max_gravity_val, o -> vel.y);
+    }
+    if (o -> coll_t) {
+        o -> vel.y += 3 * dt;
     }
 
     if (o -> coll_b == 1) {
